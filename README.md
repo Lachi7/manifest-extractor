@@ -1,4 +1,4 @@
-# Railway Manifest Extractor - Web
+# [Railway Manifest Extractor](https://manifest-extractor.onrender.com/) - Web
 
 A web version of the `GEMINI_API_VL_3` notebook. Upload a scanned railway
 shipping PDF and it extracts structured data with Gemini:
@@ -170,3 +170,7 @@ Then at https://dashboard.render.com/web/new:
 - The model defaults to `gemini-3.5-flash` (as in the notebook). Override with `GEMINI_MODEL`.
 - Everything happens per page: render → classify → extract/gng. Rate-limit (429) backoff is built in.
 - The API key lives only in server env vars; it is never sent to the browser.
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
