@@ -45,7 +45,7 @@ runs on serverless hosts. Here:
 
 ```
 .
-├── web/           # This app — Next.js frontend + serverless API routes
+├── app/           # This app — Next.js frontend + serverless API routes
 └── notebooks/     # Original Colab notebook, its own README, and requirements
 ```
 
