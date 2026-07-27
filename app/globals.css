@@ -1,0 +1,1160 @@
+:root {
+  /* ── One blue family ───────────────────────────────────────────── */
+  --navy: #0a2540; /* hero bg, headings, primary text */
+  --navy-2: #123a63; /* hero gradient depth */
+  --blue: #2563eb; /* accent, links, primary CTA */
+  --blue-hover: #1d4ed8; /* CTA / link hover */
+  --blue-soft: #e8f0fd; /* subtle fills: th, tabs, chips, inputs */
+
+  /* ── Semantic roles ────────────────────────────────────────────── */
+  --bg: #eef4fc; /* cool light-blue page background */
+  --surface: #ffffff; /* cards / panels */
+  --surface-2: var(--blue-soft);
+  --text: var(--navy);
+  --muted: #5b7089; /* blue-gray muted text */
+  --border: rgba(10, 37, 64, 0.12);
+  --border-strong: rgba(10, 37, 64, 0.24);
+  --accent: var(--blue);
+  --cta: var(--blue);
+  --bad: #c0392b; /* error red (kept distinct so errors read clearly) */
+  --focus: rgba(37, 99, 235, 0.3);
+
+  /* ── Type ──────────────────────────────────────────────────────── */
+  --font-sans: "Euclid Circular A", var(--font-jakarta), -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, sans-serif;
+  --font-data: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* ── Motion ────────────────────────────────────────────────────── */
+  --e-out: cubic-bezier(0.16, 1, 0.3, 1); /* expo-out: fast start, long settle */
+  --e-soft: cubic-bezier(0.33, 1, 0.68, 1);
+
+  /* Live scroll state, written each frame by <SmoothScroll/>. Unitless so
+     they can be multiplied inside calc(). Defaults keep the page correct
+     when Lenis never mounts (reduced motion, SSR, JS off). */
+  --scroll-y: 0; /* px scrolled */
+  --scroll-p: 0; /* 0 → 1 through the document */
+  --scroll-v: 0; /* signed velocity, ≈ −1 → 1 */
+}
+
+/* ── Lenis (from lenis/dist/lenis.css, inlined) ───────────────────── */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis:not(.lenis-autoToggle).lenis-stopped {
+  overflow: clip;
+}
+.lenis [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+.lenis.lenis-smooth iframe {
+  pointer-events: none;
+}
+.lenis.lenis-autoToggle {
+  transition-property: overflow;
+  transition-duration: 1ms;
+  transition-behavior: allow-discrete;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* Never let content force the page itself to scroll sideways — wide tables
+     scroll inside their own .table-scroll container instead. `clip` rather
+     than `hidden`: hidden makes the root a scroll container, which fights
+     Lenis for the wheel. */
+  overflow-x: clip;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--blue-hover);
+  text-decoration: underline;
+}
+
+.container {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 24px 20px 64px;
+}
+
+/* ═══ Landing ══════════════════════════════════════════════════════════
+   A scroll narrative rather than one screen: hero → how it works → what it
+   reads → closing CTA. Everything scroll-linked reads --scroll-y/-p/-v, so
+   the only JS running during a scroll is Lenis' single rAF loop.          */
+
+.container.is-landing {
+  max-width: none;
+  padding: 0; /* sections own their gutters so the hero can go full-bleed */
+}
+.landing {
+  position: relative;
+}
+
+/* Reveal-on-scroll — .is-in is added by the IntersectionObserver in
+   landing.tsx; --d staggers siblings. */
+[data-reveal] {
+  opacity: 0;
+  transform: translate3d(0, 24px, 0);
+  filter: blur(6px);
+  transition: opacity 0.75s var(--e-out) var(--d, 0ms), transform 0.95s var(--e-out) var(--d, 0ms),
+    filter 0.75s var(--e-out) var(--d, 0ms);
+}
+[data-reveal].is-in {
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+
+/* Scroll progress hairline */
+.scroll-progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 2px;
+  z-index: 30;
+  background: linear-gradient(90deg, var(--blue), #2a9fd6);
+  transform: scaleX(var(--scroll-p));
+  transform-origin: 0 50%;
+  pointer-events: none;
+}
+
+/* ── The chain: the anchor is lowered down it as the page scrolls ──── */
+.chain-rail {
+  position: fixed;
+  left: clamp(18px, 3.4vw, 46px);
+  top: 0;
+  bottom: 0;
+  width: 28px;
+  z-index: 10;
+  pointer-events: none;
+}
+.chain-track,
+.chain-drawn {
+  position: absolute;
+  left: 13px;
+  width: 2px;
+  /* dashes = chain links */
+  background-image: repeating-linear-gradient(
+    to bottom,
+    currentColor 0 6px,
+    transparent 6px 13px
+  );
+}
+.chain-track {
+  top: 0;
+  bottom: 0;
+  color: var(--border-strong);
+  opacity: 0.5;
+}
+.chain-drawn {
+  top: 0;
+  /* taut, coloured chain above the anchor — grows with scroll progress */
+  height: calc(var(--scroll-p) * (100% - 96px) + 48px);
+  color: var(--blue);
+}
+.chain-anchor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 50% 4px;
+  /* rides the chain (--scroll-p) and tilts into the drag (--scroll-v) */
+  transform: translate3d(0, calc(var(--scroll-p) * (100vh - 96px) + 34px), 0)
+    rotate(calc(var(--scroll-v) * -16deg));
+  /* a touch of lag on the tilt reads as slack in the chain */
+  transition: transform 0.12s linear;
+}
+/* Below this the 1060px content column would run into the rail — the
+   progress hairline carries the same information on narrow screens. */
+@media (max-width: 1239px) {
+  .chain-rail {
+    display: none;
+  }
+}
+
+/* ── Hero ─────────────────────────────────────────────────────────── */
+.hero {
+  position: relative;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 88px 0 96px;
+  overflow: hidden;
+}
+.hero-glow {
+  position: absolute;
+  left: -10%;
+  right: -10%;
+  top: -25%;
+  height: 120vh;
+  pointer-events: none;
+  background: radial-gradient(52% 46% at 50% 42%, rgba(37, 99, 235, 0.18), transparent 72%),
+    radial-gradient(38% 34% at 78% 68%, rgba(42, 159, 214, 0.14), transparent 70%);
+  /* drifts down slower than the page — depth behind the copy */
+  transform: translate3d(0, calc(var(--scroll-y) * 0.3px), 0);
+}
+.hero-inner {
+  position: relative;
+  width: min(680px, 100%);
+  padding: 0 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+  /* parallax: the hero holds back as the page moves, then fades out */
+  transform: translate3d(0, calc(var(--scroll-y) * 0.16px), 0);
+  opacity: clamp(0, calc(1.08 - var(--scroll-y) * 0.0016), 1);
+}
+/* Hauling the anchor up.
+   Two motions on two elements so neither overwrites the other:
+   .hero-anchor-climb  — scroll-driven rise (--scroll-y)
+   .hero-anchor-wrap   — the 7s sway, swinging from the chain above it
+   It is hero-local: nothing is fixed or sticky, so the whole block scrolls
+   away and fades out normally. The rise is tuned to clear the top of the
+   screen right around where .hero-inner's fade completes (~675px). */
+.hero-anchor-climb {
+  position: relative;
+  transform: translate3d(0, calc(var(--scroll-y) * -0.5px), 0);
+}
+.hero-chain {
+  position: absolute;
+  left: 50%;
+  margin-left: -1px;
+  top: -70vh;
+  height: calc(70vh + 30px); /* runs up out of frame — the anchor hangs from it */
+  width: 2px;
+  background-image: repeating-linear-gradient(to bottom, var(--border-strong) 0 6px, transparent 6px 13px);
+  opacity: 0.55;
+}
+.hero-anchor-wrap {
+  display: block;
+  transform-origin: 50% 14%; /* pivots where the chain meets it */
+  animation: sway 7s ease-in-out infinite;
+}
+.hero-anchor-wrap svg {
+  display: block;
+  width: clamp(84px, 12vw, 132px);
+  height: auto;
+}
+@keyframes sway {
+  0%,
+  100% {
+    transform: rotate(-5deg);
+  }
+  50% {
+    transform: rotate(5deg);
+  }
+}
+.landing-badge {
+  font-family: var(--font-data);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: var(--blue);
+  background: var(--blue-soft);
+  border: 1px solid var(--border);
+  padding: 5px 12px;
+  border-radius: 999px;
+}
+.landing-title {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.06em 0.28em;
+  font-size: clamp(30px, 6vw, 56px);
+  line-height: 1.04;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--navy);
+}
+.landing-title .word {
+  display: inline-block;
+}
+.landing-sub {
+  margin: 0;
+  max-width: 54ch;
+  color: var(--muted);
+  font-size: clamp(15px, 1.6vw, 17px);
+}
+
+/* ── Dropzone: pointer-magnetic, so the target feels physical ─────── */
+.dz-reveal {
+  width: 100%;
+  margin-top: 10px;
+}
+.dropzone {
+  --mx: 0;
+  --my: 0;
+  --tilt: 0;
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 46px 24px;
+  background: var(--surface);
+  border: 2px dashed var(--border-strong);
+  border-radius: 18px;
+  cursor: pointer;
+  transform: translate3d(calc(var(--mx) * 1px), calc(var(--my) * 1px), 0)
+    rotate(calc(var(--tilt) * 1deg));
+  transition: transform 0.6s var(--e-out), border-color 0.3s ease, background 0.3s ease,
+    box-shadow 0.6s var(--e-out);
+}
+/* sheen that sweeps across on hover */
+.dropzone::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 38%, rgba(37, 99, 235, 0.1) 50%, transparent 62%);
+  transform: translateX(-100%);
+  transition: transform 0.9s var(--e-out);
+  pointer-events: none;
+}
+.dropzone:hover::after {
+  transform: translateX(100%);
+}
+.dropzone:hover {
+  border-color: var(--blue);
+  box-shadow: 0 22px 44px -22px rgba(10, 37, 64, 0.4);
+}
+.dropzone.dragover {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+  transform: scale(1.015);
+  box-shadow: 0 26px 50px -22px rgba(37, 99, 235, 0.5);
+}
+.dropzone-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--blue);
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+  transition: transform 0.6s var(--e-out);
+}
+.dropzone:hover .dropzone-icon {
+  transform: translateY(-5px);
+}
+.dropzone.dragover .dropzone-icon {
+  animation: haul 0.9s var(--e-soft) infinite;
+}
+@keyframes haul {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  45% {
+    transform: translateY(-8px);
+  }
+}
+.dropzone-main {
+  font-weight: 600;
+  color: var(--navy);
+  font-size: 16px;
+}
+.dropzone-hint {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* ── Hero CTA → glides down to the drop zone ──────────────────────── */
+.hero-cta {
+  margin-top: 12px;
+  background: var(--cta);
+  border: 1px solid var(--cta);
+  color: #fff;
+  font-weight: 600;
+  font-size: 15px;
+  padding: 12px 26px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 0.5s var(--e-out), background 0.3s ease, box-shadow 0.5s var(--e-out);
+  box-shadow: 0 14px 30px -16px rgba(37, 99, 235, 0.9);
+}
+.hero-cta:hover {
+  background: var(--blue-hover);
+  border-color: var(--blue-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 20px 38px -16px rgba(37, 99, 235, 0.95);
+}
+.hero-cta:active {
+  transform: translateY(0);
+}
+
+/* ── Drop a PDF anywhere ──────────────────────────────────────────── */
+.drop-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background: rgba(10, 37, 64, 0.62);
+  animation: veil-in 0.25s var(--e-out);
+}
+@keyframes veil-in {
+  from {
+    opacity: 0;
+  }
+}
+.drop-veil-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 40px 54px;
+  border-radius: 20px;
+  border: 2px dashed rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-weight: 600;
+  font-size: 17px;
+}
+.drop-veil-inner .dropzone-icon {
+  animation: haul 0.9s var(--e-soft) infinite;
+}
+
+/* Errors surface wherever you are on the page — you can drop from anywhere. */
+.landing-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 45;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 12px 18px;
+  border-radius: 12px;
+  background: var(--bad);
+  color: #fff;
+  font-size: 13.5px;
+  box-shadow: 0 18px 40px -18px rgba(10, 37, 64, 0.7);
+  animation: toast-in 0.4s var(--e-out);
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+}
+
+/* ── Scroll cue ───────────────────────────────────────────────────── */
+.scroll-cue {
+  position: absolute;
+  bottom: 28px;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-data);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  /* scroll-linked: gone as soon as you've taken the hint. Deliberately NOT a
+     [data-reveal] element — a transitioned opacity can't also be scroll-driven
+     (the target moves every frame, so the transition never lands). Its entrance
+     is an animation, and `backwards` hands opacity back to the clamp when the
+     animation finishes. */
+  opacity: clamp(0, calc(1 - var(--scroll-y) * 0.005), 1);
+  animation: cue-in 0.8s var(--e-out) 1s backwards;
+}
+@keyframes cue-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+.cue-chevron {
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid var(--blue);
+  border-bottom: 2px solid var(--blue);
+  animation: bob 1.9s var(--e-soft) infinite;
+}
+@keyframes bob {
+  0%,
+  100% {
+    transform: rotate(45deg) translate(0, 0);
+    opacity: 0.45;
+  }
+  50% {
+    transform: rotate(45deg) translate(4px, 4px);
+    opacity: 1;
+  }
+}
+
+/* ── Sections ─────────────────────────────────────────────────────── */
+.section {
+  position: relative;
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: clamp(72px, 11vw, 130px) 24px;
+}
+.section-title {
+  margin: 0;
+  font-size: clamp(24px, 3.6vw, 36px);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--navy);
+}
+.section-lead {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+  max-width: 56ch;
+}
+
+.steps,
+.cap-grid {
+  display: grid;
+  gap: 16px;
+  margin-top: 36px;
+}
+.steps {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.cap-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 860px) {
+  .steps,
+  .cap-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.step-card,
+.cap-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px 22px;
+  transition: transform 0.5s var(--e-out), box-shadow 0.5s var(--e-out), border-color 0.3s ease;
+}
+.step-card:hover,
+.cap-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(37, 99, 235, 0.4);
+  box-shadow: 0 20px 40px -24px rgba(10, 37, 64, 0.45);
+}
+.step-card h3,
+.cap-card h3 {
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 650;
+  color: var(--navy);
+  letter-spacing: -0.01em;
+}
+.step-card p,
+.cap-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.step-n {
+  font-family: var(--font-data);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  color: var(--blue);
+  margin-bottom: 14px;
+}
+/* keep the hover lift from fighting the reveal transform */
+.step-card[data-reveal]:not(.is-in),
+.cap-card[data-reveal]:not(.is-in) {
+  transition: opacity 0.75s var(--e-out) var(--d, 0ms), transform 0.95s var(--e-out) var(--d, 0ms),
+    filter 0.75s var(--e-out) var(--d, 0ms);
+}
+
+/* ── Closing CTA ──────────────────────────────────────────────────── */
+.closing {
+  padding-bottom: clamp(56px, 8vw, 96px);
+}
+.closing-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  padding: clamp(36px, 6vw, 60px) clamp(24px, 5vw, 56px);
+  border-radius: 22px;
+  color: rgba(234, 241, 251, 0.8);
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 100%);
+  border-bottom: 3px solid var(--blue);
+}
+.closing-card h2 {
+  margin: 0;
+  color: #fff;
+  font-size: clamp(24px, 4vw, 34px);
+  letter-spacing: -0.025em;
+}
+.closing-card p {
+  margin: 0;
+  max-width: 52ch;
+}
+.closing-card .dz-reveal,
+.closing-card .dropzone {
+  max-width: 460px;
+}
+.closing-anchor {
+  animation: sway 7s ease-in-out infinite;
+  transform-origin: 50% 14%;
+}
+.link-btn {
+  background: none;
+  border: none;
+  color: rgba(234, 241, 251, 0.75);
+  font-family: var(--font-data);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  padding: 4px;
+  cursor: pointer;
+}
+.link-btn:hover {
+  color: #fff;
+}
+
+.landing-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 28px 24px 44px;
+  color: var(--muted);
+  font-size: 12.5px;
+  text-align: center;
+  flex-wrap: wrap;
+}
+/* ── Hero header ──────────────────────────────────────────────────── */
+header.app-header {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 20px;
+  padding: 26px 28px 30px;
+  border-radius: 14px;
+  color: rgba(234, 241, 251, 0.78);
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 100%);
+  border-bottom: 3px solid var(--blue); /* ties the hero to the CTA color */
+}
+header.app-header h1 {
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(20px, 3.4vw, 28px);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+header.app-header p {
+  margin: 0;
+  max-width: 70ch;
+}
+
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* Compact header shown in the workspace (after a file is loaded) */
+header.app-header.compact {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px;
+  flex-wrap: wrap;
+}
+header.app-header.compact h1 {
+  font-size: clamp(18px, 2.6vw, 22px);
+}
+header.app-header .file-name {
+  font-family: var(--font-data);
+  font-size: 12.5px;
+  color: rgba(234, 241, 251, 0.68);
+  margin-top: 3px;
+  word-break: break-all;
+}
+.ghost-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.ghost-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.45);
+}
+.ghost-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.field label {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+input[type="file"] {
+  color: var(--muted);
+  max-width: 100%;
+}
+
+select,
+button {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+select:hover,
+button:hover:not(:disabled) {
+  border-color: var(--border-strong);
+}
+
+input[type="text"] {
+  font: inherit;
+  color: var(--text);
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+input[type="text"]::placeholder {
+  color: var(--muted);
+}
+
+select:focus,
+button:focus-visible,
+input:focus,
+input:focus-visible {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--focus);
+}
+
+button.primary {
+  background: var(--cta);
+  border-color: var(--cta);
+  color: #fff;
+  font-weight: 600;
+}
+button.primary:hover:not(:disabled) {
+  background: var(--blue-hover);
+  border-color: var(--blue-hover);
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Two-column work area ─────────────────────────────────────────── */
+.grid {
+  display: grid;
+  /* minmax(0,…) lets BOTH tracks shrink below their content's intrinsic
+     width, so a wide table scrolls inside .table-scroll instead of blowing
+     out the layout. */
+  grid-template-columns: minmax(0, 340px) minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+.grid > * {
+  min-width: 0; /* essential companion to minmax(0,…) — the real overflow fix */
+}
+@media (max-width: 960px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.preview-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.preview-img {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  min-height: 200px;
+  object-fit: contain;
+}
+.preview-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.preview-clickable {
+  cursor: zoom-in;
+}
+
+.btn-link {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  text-decoration: none;
+  display: inline-block;
+}
+.btn-link:hover {
+  border-color: var(--blue);
+  text-decoration: none;
+}
+
+/* ── Enlarge modal ────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 37, 64, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 24px;
+}
+.modal-body {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: min(1200px, 96vw);
+  height: min(92vh, 100%);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.modal-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.modal-scroll {
+  flex: 1;
+  overflow: auto;
+  background: #dbe6f4;
+  padding: 12px;
+  text-align: center;
+}
+.modal-img {
+  display: inline-block;
+  max-width: none; /* keep full resolution so dense tables can be inspected by scrolling */
+  background: #fff;
+  border-radius: 4px;
+}
+.page-nav {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ── Status + progress ────────────────────────────────────────────── */
+.status {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  min-height: 20px;
+  overflow-wrap: anywhere; /* long error JSON must wrap, not overflow */
+}
+.status.error {
+  color: var(--bad);
+  border-color: var(--bad);
+  background: rgba(192, 57, 43, 0.06);
+}
+
+.progress-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+  margin-top: 10px;
+  border: 1px solid var(--border);
+}
+.progress-bar {
+  height: 100%;
+  background: var(--blue);
+  transition: width 0.2s ease;
+}
+
+/* ── Tabs ─────────────────────────────────────────────────────────── */
+.tabs {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.tab {
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+  color: var(--muted);
+}
+.tab.active {
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--navy);
+  font-weight: 600;
+}
+
+.table-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.btn-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.header-box {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.header-box-title {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.header-json {
+  margin: 0;
+  font-family: var(--font-data);
+  font-size: 12px;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 220px;
+  overflow: auto;
+}
+.count-pill {
+  color: var(--muted);
+  font-family: var(--font-data);
+  font-size: 13px;
+}
+
+/* ── Data table ───────────────────────────────────────────────────── */
+.table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  -webkit-overflow-scrolling: touch;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+th,
+td {
+  border-bottom: 1px solid var(--border);
+  padding: 7px 10px;
+  text-align: left;
+}
+th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-weight: 600;
+  z-index: 1;
+  white-space: nowrap;
+}
+tbody tr:hover {
+  background: rgba(37, 99, 235, 0.06);
+}
+td.num {
+  text-align: right;
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+}
+.empty-cell {
+  color: var(--muted);
+}
+
+.cell-input {
+  font-family: var(--font-data);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  width: 100%;
+  min-width: 150px;
+}
+.cell-input:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--focus);
+}
+
+.chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+.chip {
+  font-family: var(--font-data);
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.hint {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+/* ── Reduced motion ───────────────────────────────────────────────────
+   <SmoothScroll/> bails out entirely (so --scroll-* stay 0 and every
+   scroll-linked transform is already neutral); this kills the decorative
+   loops and lands each reveal in its final state. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  [data-reveal],
+  [data-reveal].is-in {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+  .hero-inner,
+  .hero-anchor-climb {
+    transform: none;
+    opacity: 1;
+  }
+  .chain-rail,
+  .scroll-progress,
+  .scroll-cue,
+  .hero-chain,
+  .hero-glow {
+    display: none;
+  }
+}
+
+/* ── Small screens ────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  body {
+    font-size: 13.5px;
+  }
+  .hero {
+    min-height: 92svh;
+    padding: 64px 0 88px;
+  }
+  .dropzone {
+    padding: 34px 18px;
+  }
+  .section {
+    padding: 64px 18px;
+  }
+  .closing-card {
+    border-radius: 18px;
+  }
+  .container {
+    padding: 16px 14px 48px;
+  }
+  header.app-header {
+    padding: 20px 18px 22px;
+  }
+  .panel {
+    padding: 13px;
+  }
+  .controls {
+    gap: 10px;
+  }
+  .field {
+    flex: 1 1 100%; /* stack controls full-width so nothing gets clipped */
+  }
+  .field input[type="text"],
+  .field select {
+    width: 100% !important;
+  }
+  .modal-overlay {
+    padding: 10px;
+  }
+}
