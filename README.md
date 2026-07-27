@@ -1,4 +1,4 @@
-# Railway Manifest Extractor — Web
+# Railway Manifest Extractor - Web
 
 A web version of the `GEMINI_API_VL_3` notebook. Upload a scanned railway
 shipping PDF and it extracts structured data with Gemini:
