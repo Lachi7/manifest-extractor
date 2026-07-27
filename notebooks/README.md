@@ -1,6 +1,6 @@
 # Railway Document Data Extraction - Gemini Vision Pipeline
 
-(A Google Colab notebook)[https://colab.research.google.com/drive/1DFifNzRHTT3Pv8kvLrR14tx5a-_US-Z_?usp=sharing] that uses Google's Gemini vision-language model to extract structured data from scanned Russian-language railway shipping documents, converting messy scanned paperwork into clean, exportable spreadsheets (CSV/JSON).
+[A Google Colab notebook](https://colab.research.google.com/drive/1DFifNzRHTT3Pv8kvLrR14tx5a-_US-Z_?usp=sharing) that uses Google's Gemini vision-language model to extract structured data from scanned Russian-language railway shipping documents, converting messy scanned paperwork into clean, exportable spreadsheets (CSV/JSON).
 
 Built at **ASCO CSJC** to replace the manual process of locating wagon numbers, container/waybill numbers, and ГНГ/QNQ codes across scanned PDF manifests and typing them into Excel by hand.
 
