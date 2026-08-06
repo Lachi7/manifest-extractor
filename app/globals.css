@@ -1046,6 +1046,22 @@ td.num {
   color: var(--muted);
 }
 
+/* Reference-ID matching: a name resolved by fuzzy match, or not at all.
+   Underlines rather than fills, so the table still reads as data. */
+td.cell-fuzzy {
+  text-decoration: underline dotted var(--blue) 1.5px;
+  text-underline-offset: 3px;
+  cursor: help;
+}
+td.cell-unmatched {
+  text-decoration: underline wavy var(--bad) 1.5px;
+  text-underline-offset: 3px;
+  cursor: help;
+}
+tr.row-unmatched td {
+  background: rgba(192, 57, 43, 0.05);
+}
+
 .cell-input {
   font-family: var(--font-data);
   font-size: 12.5px;

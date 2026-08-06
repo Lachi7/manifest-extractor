@@ -1,7 +1,7 @@
 import { Type, type Schema } from "@google/genai";
 
 /**
- * Response schemas + prompts, ported 1:1 from the GEMINI_API_VL_3 notebook.
+ * Response schemas + prompts, ported 1:1 from the GEMINI_API_VL_5 notebook.
  * The Pydantic models become Gemini `responseSchema` objects; field
  * descriptions are preserved because the model relies on them heavily.
  */
@@ -41,7 +41,7 @@ const WagonRow: Schema = {
       type: Type.STRING,
       nullable: true,
       description:
-        "Column 6: the container/waybill (накладной) number, an 8-digit number distinct from the wagon number, e.g. 50025591 or 30078451. This column is directly to the right of column 5 and almost always has a value.",
+        "Column 6: the container/waybill (накладной) number, an 8-digit number distinct from the wagon number, e.g. 44455566. This column is directly to the right of column 5 and almost always has a value.",
     },
     owner_code: { type: Type.STRING, nullable: true, description: "Column 7 (стр отп): 2-letter code, e.g. UZ" },
     origin_station: { type: Type.STRING, nullable: true, description: "Column 8: Станция отправления" },
@@ -115,13 +115,13 @@ const WagonSummaryRow: Schema = {
     row_no: { type: Type.INTEGER },
     wagon_number: { type: Type.STRING, description: "№ Вагонов column" },
     waybill_number: { type: Type.STRING, description: "№ Накладных column" },
-    container_number: { type: Type.STRING, nullable: true, description: "№ Контейнеров, handwritten, e.g. '17ш'" },
+    container_number: { type: Type.STRING, nullable: true, description: "№ Контейнеров, handwritten, e.g. '17'" },
     station_code: { type: Type.STRING, nullable: true, description: "Код Стр, e.g. 20, 26, 57" },
     origin_station: { type: Type.STRING, nullable: true, description: "Станция Отправления column" },
     destination_station: { type: Type.STRING, nullable: true, description: "Станция Назначения column" },
     cargo_name: { type: Type.STRING, nullable: true, description: "Наименование Груза column" },
     net_weight: { type: Type.NUMBER, nullable: true, description: "Вес Нетто column, e.g. 66.983" },
-    gross_weight: { type: Type.NUMBER, nullable: true, description: "Вес Брутто column, e.g. 92.983 — must be larger than net_weight" },
+    gross_weight: { type: Type.NUMBER, nullable: true, description: "Вес Брутто column, e.g. 92.983, must be larger than net_weight" },
     ferry_payer: { type: Type.STRING, nullable: true, description: "За Паром" },
     bridge_payer: { type: Type.STRING, nullable: true, description: "За Мост" },
   },
@@ -168,12 +168,12 @@ export const GNGWagonPairSchema: Schema = {
       type: Type.STRING,
       nullable: true,
       description:
-        "The ГНГ code, found inside box '15 Наименование груза', printed as 'ГНГ' or 'ГНГ:' followed by a number (e.g. 'ГНГ 99220000', 'ГНГ: 31021015'). Extract ONLY the digits, not the 'ГНГ' label. Some pages (e.g. a Пересылочная накладная 'on perevozku porozhnego vagona' form) have no box 15 at all and no ГНГ code — if genuinely absent anywhere on the page, return null. Do not invent one.",
+        "The ГНГ code, found inside box '15 Наименование груза', printed as 'ГНГ' or 'ГНГ:' followed by a number (e.g. 'ГНГ 99220000'). Extract ONLY the digits, not the 'ГНГ' label. Some pages (e.g. a Пересылочная накладная 'on perevozku porozhnego vagona' form) have no box 15 at all and no ГНГ code - if genuinely absent anywhere on the page, return null. Do not invent one.",
     },
     wagon_code: {
       type: Type.STRING,
       description:
-        "The wagon number from box '7 Вагон' (Накладная СМГС forms) or box '1. Вагон' (Пересылочная накладная forms). Often handwritten in blue ink over a printed box. May be followed by a slash and a 2-digit series code (e.g. '24203978/28') or a space and series code (e.g. '95909552 20') — capture the FULL value including anything after the slash or space.",
+        "The wagon number from box '7 Вагон' (Накладная СМГС forms) or box '1. Вагон' (Пересылочная накладная forms). Often handwritten in blue ink over a printed box. May be followed by a slash and a 2-digit series code (e.g. '11111111/11') or a space and series code (e.g. '22222222 22') - capture the FULL value including anything after the slash or space.",
     },
   },
   required: ["wagon_code"],

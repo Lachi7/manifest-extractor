@@ -26,7 +26,7 @@ const STEPS = [
   {
     n: "03",
     title: "Tables come back",
-    body: "Rows are extracted into a strict schema, GNG codes are joined to their wagons, and the result downloads as CSV or JSON.",
+    body: "Rows are extracted into a strict schema, GNG codes are joined to their wagons, station and customer names are matched to their master-data IDs, and the result downloads as CSV or JSON.",
   },
 ];
 
@@ -34,6 +34,7 @@ const CAPS = [
   { k: "Transfer manifest", v: "16 columns per wagon — numbers, stations, cargo codes, net and gross weight." },
   { k: "Wagon summary", v: "Waybill numbers, containers, ferry and bridge payers, station codes." },
   { k: "GNG / waybills", v: "СМГС and Пересылочная накладная forms read down to the wagon and GNG code." },
+  { k: "Reference IDs", v: "Stations, carriers and payers matched to master-data port and customer IDs — Azerbaijani, Russian or English spelling." },
   { k: "Auto-classify", v: "No page-type picking required — or pin the type to halve the API calls." },
   { k: "Rotate & enlarge", v: "Fix sideways scans and inspect any page at full render resolution before extracting." },
   { k: "CSV / JSON export", v: "Both tables and the waybill join, header block included, one click each." },

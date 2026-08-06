@@ -1,12 +1,42 @@
 # Railway Manifest Extractor — Web
 
-A web version of the `GEMINI_API_VL_3` notebook. Upload a scanned railway
+A web version of the `GEMINI_API_VL_5` notebook. Upload a scanned railway
 shipping PDF and it extracts structured data with Gemini:
 
 - **Page auto-classification** — `transfer_manifest_table`, `wagon_summary_table`, `single_wagon_waybill`, `other`
 - **Table extraction** — the two manifest table types (same schemas + prompts as the notebook)
-- **GNG / wagon extraction** from single-wagon waybills (СМГС / Пересылочная накладная), **merged into the summary table** by wagon number
+- **GNG / wagon extraction** from single-wagon waybills (СМГС / Пересылочная накладная), **merged into both tables** by wagon number
+- **Master-data reference IDs** — stations, carriers and payers matched to port / customer IDs (see below)
 - **Per-page rotation** for sideways scans, preview, CSV download (Excel-friendly, UTF-8 BOM)
+
+## Reference IDs (master data)
+
+The notebook's `add_reference_ids` step runs here too, entirely in the browser:
+
+- `origin_station` / `destination_station` → `origin_port_id` / `destination_port_id`
+- `carrier` → `carrier_id` (transfer manifest), `ferry_payer` / `bridge_payer` → `ferry_payer_id` / `bridge_payer_id` (wagon summary)
+
+Each ID column sits immediately after the name it came from, matching
+`reorder_with_ids_adjacent`. Names are normalized first (Azerbaijani letters
+folded to Latin, upper-cased, `(ЭКСП.)` dropped, punctuation stripped), matched
+exactly if possible, then fuzzy-matched with a port of rapidfuzz's `WRatio` at
+the notebook's **89%** cutoff — verified against rapidfuzz itself, so the same
+values resolve to the same IDs. Ports match on any of their three spellings
+(Azerbaijani / Russian / English).
+
+The **Reference IDs** control switches the cutoff (89% / 95% / exact-only / off),
+and the **Match review** tab lists every value that matched below 100%, worst
+first — the notebook's low-confidence report. In the tables those cells are
+underlined: dotted blue for a fuzzy match (hover for the matched name and
+score), wavy red for no match at all.
+
+The master lists are baked into the bundle from the spreadsheet exports, so
+there is nothing to upload. After editing `master_data.xlsx`, re-export the two
+sheets to CSV next to the notebook and regenerate:
+
+```bash
+node scripts/gen-master-data.mjs        # → lib/master-data.ts
+```
 
 The landing page runs on [Lenis](https://github.com/darkroomengineering/lenis) smooth
 scroll (`app/smooth-scroll.tsx`). It publishes the scroll state as CSS custom
@@ -81,7 +111,7 @@ Set in `.env.local`:
 ```
 GEMINI_API_KEY=your_key_here
 # optional:
-GEMINI_MODEL=gemini-3.5-flash
+GEMINI_MODEL=gemini-2.5-flash
 ```
 
 Get a key at https://aistudio.google.com/apikey
@@ -167,6 +197,7 @@ Then at https://dashboard.render.com/web/new:
 
 ## Notes
 
-- The model defaults to `gemini-3.5-flash` (as in the notebook). Override with `GEMINI_MODEL`.
+- The model defaults to `gemini-2.5-flash` (as in `GEMINI_API_VL_5`). Override with `GEMINI_MODEL`.
 - Everything happens per page: render → classify → extract/gng. Rate-limit (429) backoff is built in.
 - The API key lives only in server env vars; it is never sent to the browser.
+- Reference-ID matching costs no API calls — it runs on the extracted rows in the browser.

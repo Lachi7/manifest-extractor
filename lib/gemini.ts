@@ -1,6 +1,7 @@
 import { GoogleGenAI, type Schema } from "@google/genai";
 
-export const MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash";
+// Matches GEMINI_API_VL_5. Override with GEMINI_MODEL without touching code.
+export const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));

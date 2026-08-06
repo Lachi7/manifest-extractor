@@ -9,6 +9,17 @@ import { loadPdf, renderPage, stripDataUrl } from "@/lib/pdf";
 import { toCsv, downloadCsv, downloadJson, excludeNone } from "@/lib/csv";
 import { gngResultsToRows, mergeGngByWagon } from "@/lib/merge";
 import { parsePageSpec, allPages } from "@/lib/pages";
+import {
+  addReferenceIds,
+  buildLookups,
+  reorderWithIdsAdjacent,
+  DEFAULT_SCORE_CUTOFF,
+  MANIFEST_CUSTOMER_COLUMNS,
+  MANIFEST_PORT_COLUMNS,
+  SUMMARY_CUSTOMER_COLUMNS,
+  SUMMARY_PORT_COLUMNS,
+  type ReviewRow,
+} from "@/lib/reference";
 import type { DocType, GNGRow, GNGWagonPair, PageExtraction, WagonRow, WagonSummaryRow } from "@/lib/types";
 
 const PREVIEW_LONG_EDGE = 900; // matches preview_page(max_width=900)
@@ -24,6 +35,20 @@ const SUMMARY_COLS: (keyof WagonSummaryRow)[] = [
   "ferry_payer", "bridge_payer", "gng_code",
 ];
 const GNG_COLS: (keyof GNGRow)[] = ["wagon_number", "wagon_code_raw", "gng_code"];
+const REVIEW_COLS = ["table", "row", "column", "value", "matched_as", "score", "id"];
+
+// add_reference_ids(...) column maps, per table, as called in the notebook.
+const MANIFEST_ID_MAP = { ...MANIFEST_PORT_COLUMNS, ...MANIFEST_CUSTOMER_COLUMNS };
+const SUMMARY_ID_MAP = { ...SUMMARY_PORT_COLUMNS, ...SUMMARY_CUSTOMER_COLUMNS };
+const ID_COLS = [...new Set([...Object.values(MANIFEST_ID_MAP), ...Object.values(SUMMARY_ID_MAP)])];
+
+/** Reference-ID modes: the notebook's 89% cutoff, a stricter one, or off. */
+const MATCH_MODES = [
+  { value: String(DEFAULT_SCORE_CUTOFF), label: `Fuzzy ${DEFAULT_SCORE_CUTOFF}% (notebook)` },
+  { value: "95", label: "Fuzzy 95% (strict)" },
+  { value: "100", label: "Exact names only" },
+  { value: "off", label: "Off" },
+];
 
 async function callApi<T>(endpoint: string, imageBase64: string): Promise<T> {
   const res = await fetch(`/api/${endpoint}`, {
@@ -65,7 +90,9 @@ export default function Home() {
   const [gngRows, setGngRows] = useState<GNGRow[]>([]);
   const [manifestHeader, setManifestHeader] = useState<Record<string, unknown> | null>(null);
   const [summaryHeader, setSummaryHeader] = useState<Record<string, unknown> | null>(null);
-  const [tab, setTab] = useState<"summary" | "manifest" | "gng">("summary");
+  const [tab, setTab] = useState<"summary" | "manifest" | "gng" | "review">("summary");
+  // Reference-ID matching against the bundled master data (Ports / Customers).
+  const [matchMode, setMatchMode] = useState<string>(String(DEFAULT_SCORE_CUTOFF));
 
   function setErr(msg: string) {
     setStatus(msg);
@@ -317,6 +344,63 @@ export default function Home() {
   const mergedSummary = useMemo(() => mergeGngByWagon(summaryRows, gngRows), [summaryRows, gngRows]);
   const mergedManifest = useMemo(() => mergeGngByWagon(manifestRows, gngRows), [manifestRows, gngRows]);
 
+  // The master lists are static — normalize and index them once per session.
+  const lookups = useMemo(() => buildLookups(), []);
+  const cutoff = matchMode === "off" ? null : Number(matchMode);
+
+  // Derived: add_reference_ids() over each table. Runs entirely in the browser,
+  // so changing the cutoff (or an edited GNG wagon number) re-matches instantly.
+  const summaryWithIds = useMemo(
+    () =>
+      cutoff === null
+        ? { rows: mergedSummary as unknown as Record<string, unknown>[], review: [] as ReviewRow[] }
+        : addReferenceIds(mergedSummary as unknown as Record<string, unknown>[], {
+            portColumns: SUMMARY_PORT_COLUMNS,
+            customerColumns: SUMMARY_CUSTOMER_COLUMNS,
+            lookups,
+            scoreCutoff: cutoff,
+          }),
+    [mergedSummary, lookups, cutoff]
+  );
+  const manifestWithIds = useMemo(
+    () =>
+      cutoff === null
+        ? { rows: mergedManifest as unknown as Record<string, unknown>[], review: [] as ReviewRow[] }
+        : addReferenceIds(mergedManifest as unknown as Record<string, unknown>[], {
+            portColumns: MANIFEST_PORT_COLUMNS,
+            customerColumns: MANIFEST_CUSTOMER_COLUMNS,
+            lookups,
+            scoreCutoff: cutoff,
+          }),
+    [mergedManifest, lookups, cutoff]
+  );
+
+  const summaryCols = useMemo(
+    () => (cutoff === null ? SUMMARY_COLS : reorderWithIdsAdjacent(SUMMARY_COLS as string[], SUMMARY_ID_MAP)),
+    [cutoff]
+  ) as string[];
+  const manifestCols = useMemo(
+    () => (cutoff === null ? MANIFEST_COLS : reorderWithIdsAdjacent(MANIFEST_COLS as string[], MANIFEST_ID_MAP)),
+    [cutoff]
+  ) as string[];
+
+  // Every value that matched below 100% (or not at all), worst first — the
+  // notebook's low-confidence report, as a tab.
+  const reviewRows = useMemo(
+    () =>
+      [
+        ...summaryWithIds.review.map((r) => ({ ...r, table: "wagon_summary" })),
+        ...manifestWithIds.review.map((r) => ({ ...r, table: "transfer_manifest" })),
+      ].sort((a, b) => a.score - b.score),
+    [summaryWithIds, manifestWithIds]
+  );
+  const unmatchedCount = reviewRows.filter((r) => r.id === null).length;
+
+  // `${rowIndex}:${column}` → match note, so a fuzzy or failed match can be
+  // flagged on the cell it came from.
+  const summaryNotes = useMemo(() => noteMap(summaryWithIds.review), [summaryWithIds]);
+  const manifestNotes = useMemo(() => noteMap(manifestWithIds.review), [manifestWithIds]);
+
   function updateGngWagon(index: number, value: string) {
     setGngRows((prev) => prev.map((r, i) => (i === index ? { ...r, wagon_number: value } : r)));
   }
@@ -375,6 +459,16 @@ export default function Home() {
               <option value={300}>300 (lighter)</option>
               <option value={400}>400</option>
               <option value={500}>500 (notebook)</option>
+            </select>
+          </div>
+          <div className="field">
+            <label>Reference IDs</label>
+            <select value={matchMode} onChange={(e) => setMatchMode(e.target.value)} disabled={busy}>
+              {MATCH_MODES.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
             </select>
           </div>
           <div className="field">
@@ -467,32 +561,47 @@ export default function Home() {
               <button className={`tab ${tab === "gng" ? "active" : ""}`} onClick={() => setTab("gng")}>
                 GNG / waybills {gngRows.length ? `(${gngRows.length})` : ""}
               </button>
+              <button className={`tab ${tab === "review" ? "active" : ""}`} onClick={() => setTab("review")}>
+                Match review {reviewRows.length ? `(${reviewRows.length})` : ""}
+              </button>
             </div>
 
             {tab === "summary" && (
               <TableView
-                rows={mergedSummary as unknown as Record<string, unknown>[]}
-                columns={SUMMARY_COLS as string[]}
-                numeric={["row_no", "net_weight", "gross_weight"]}
+                rows={summaryWithIds.rows}
+                columns={summaryCols}
+                numeric={["row_no", "net_weight", "gross_weight", ...ID_COLS]}
                 base={baseName(fileName)}
                 slug="wagon_summary"
                 header={summaryHeader}
+                notes={summaryNotes}
                 emptyHint="Run Extract to populate the wagon summary table."
               />
             )}
             {tab === "manifest" && (
               <TableView
-                rows={mergedManifest as unknown as Record<string, unknown>[]}
-                columns={MANIFEST_COLS as string[]}
-                numeric={["row_no", "net_weight_kg", "gross_weight_kg"]}
+                rows={manifestWithIds.rows}
+                columns={manifestCols}
+                numeric={["row_no", "net_weight_kg", "gross_weight_kg", ...ID_COLS]}
                 base={baseName(fileName)}
                 slug="transfer_manifest"
                 header={manifestHeader}
+                notes={manifestNotes}
                 emptyHint="Run Extract to populate the transfer manifest table."
               />
             )}
             {tab === "gng" && (
               <GngTableView rows={gngRows} onWagonChange={updateGngWagon} base={baseName(fileName)} />
+            )}
+            {tab === "review" && (
+              <ReviewView
+                rows={reviewRows}
+                unmatched={unmatchedCount}
+                cutoff={cutoff}
+                base={baseName(fileName)}
+                hasData={mergedSummary.length + mergedManifest.length > 0}
+                masterCounts={{ ports: lookups.portCount, customers: lookups.customerCount }}
+              />
             )}
           </div>
           </div>
@@ -535,6 +644,13 @@ function baseName(name: string): string {
   return name.replace(/\.pdf$/i, "") || "manifest";
 }
 
+/** Index the below-100 matches by the cell they came from. */
+function noteMap(review: ReviewRow[]): Map<string, ReviewRow> {
+  const map = new Map<string, ReviewRow>();
+  for (const r of review) map.set(`${r.rowIndex}:${r.column}`, r);
+  return map;
+}
+
 function TableView({
   rows,
   columns,
@@ -542,6 +658,7 @@ function TableView({
   base,
   slug,
   header,
+  notes,
   emptyHint,
 }: {
   rows: Record<string, unknown>[];
@@ -550,6 +667,7 @@ function TableView({
   base: string;
   slug: string;
   header?: Record<string, unknown> | null;
+  notes?: Map<string, ReviewRow>;
   emptyHint: string;
 }) {
   const cleanHeader = header ? excludeNone(header) : null;
@@ -584,12 +702,115 @@ function TableView({
                 {columns.map((c) => {
                   const v = r[c];
                   const empty = v === null || v === undefined || v === "";
+                  // A source column whose name matched fuzzily (or not at all)
+                  // is flagged, with the matched master name in the tooltip.
+                  const note = notes?.get(`${i}:${c}`);
+                  const cls = [
+                    numSet.has(c) ? "num" : "",
+                    note ? (note.id === null ? "cell-unmatched" : "cell-fuzzy") : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
+                  const title = note
+                    ? note.id === null
+                      ? "No master-data match — id left empty"
+                      : `Matched "${note.matchedAs}" → id ${note.id} (${note.score.toFixed(0)}%)`
+                    : undefined;
                   return (
-                    <td key={c} className={numSet.has(c) ? "num" : ""}>
+                    <td key={c} className={cls} title={title}>
                       {empty ? <span className="empty-cell">—</span> : String(v)}
                     </td>
                   );
                 })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ── Match review ──────────────────────────────────────────────────────
+   The notebook prints every value that matched below 100% as a DataFrame
+   before you trust the ID columns; this is the same list, worst score first. */
+function ReviewView({
+  rows,
+  unmatched,
+  cutoff,
+  base,
+  hasData,
+  masterCounts,
+}: {
+  rows: (ReviewRow & { table: string })[];
+  unmatched: number;
+  cutoff: number | null;
+  base: string;
+  hasData: boolean;
+  masterCounts: { ports: number; customers: number };
+}) {
+  if (cutoff === null)
+    return (
+      <p className="hint">
+        Reference-ID matching is off. Pick a cutoff under <strong>Reference IDs</strong> to add
+        port and customer IDs to the tables.
+      </p>
+    );
+  if (!hasData) return <p className="hint">Run Extract to match station and payer names against the master data.</p>;
+  if (rows.length === 0)
+    return (
+      <p className="hint">
+        Every station, carrier and payer name matched the master data exactly — nothing to review.
+      </p>
+    );
+
+  const csvRows = rows.map((r) => ({
+    table: r.table,
+    row: r.rowIndex + 1,
+    column: r.column,
+    value: r.value ?? "",
+    matched_as: r.matchedAs ?? "",
+    score: r.score ? r.score.toFixed(1) : "",
+    id: r.id ?? "",
+  }));
+
+  return (
+    <div>
+      <p className="hint" style={{ marginTop: 0 }}>
+        {rows.length} value(s) matched below 100% at a {cutoff}% cutoff, {unmatched} with no match at all. Master
+        data: {masterCounts.ports} ports, {masterCounts.customers} customers.
+      </p>
+      <div className="table-toolbar">
+        <span className="count-pill">{rows.length} value(s)</span>
+        <div className="btn-row">
+          <button onClick={() => downloadCsv(`${base}_match_review.csv`, toCsv(csvRows, REVIEW_COLS))}>
+            Download CSV
+          </button>
+        </div>
+      </div>
+      <div className="table-scroll" data-lenis-prevent>
+        <table>
+          <thead>
+            <tr>
+              <th>table</th>
+              <th>row</th>
+              <th>column</th>
+              <th>value</th>
+              <th>matched_as</th>
+              <th>score</th>
+              <th>id</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i} className={r.id === null ? "row-unmatched" : ""}>
+                <td>{r.table}</td>
+                <td className="num">{r.rowIndex + 1}</td>
+                <td>{r.column}</td>
+                <td>{r.value ? String(r.value) : <span className="empty-cell">—</span>}</td>
+                <td>{r.matchedAs ?? <span className="empty-cell">no match</span>}</td>
+                <td className="num">{r.score ? r.score.toFixed(1) : <span className="empty-cell">—</span>}</td>
+                <td className="num">{r.id ?? <span className="empty-cell">—</span>}</td>
               </tr>
             ))}
           </tbody>
