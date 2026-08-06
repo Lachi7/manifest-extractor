@@ -69,6 +69,17 @@ export default function SmoothScroll() {
     lenis.on("scroll", onScroll);
     onScroll();
 
+    // Shift+wheel is how a mouse pans a wide table sideways, but the browser
+    // reports it as deltaY — which Lenis reads as "scroll the page". Hide those
+    // events from Lenis (capture phase on window runs before its own listener)
+    // and let the browser scroll the hovered table natively.
+    const onWheelCapture = (e: WheelEvent) => {
+      if (!e.shiftKey) return;
+      const target = e.target as Element | null;
+      if (target?.closest?.("[data-lenis-prevent-horizontal]")) e.stopPropagation();
+    };
+    window.addEventListener("wheel", onWheelCapture, { capture: true });
+
     let frame = requestAnimationFrame(function raf(time: number) {
       lenis.raf(time);
       frame = requestAnimationFrame(raf);
@@ -76,6 +87,7 @@ export default function SmoothScroll() {
 
     return () => {
       cancelAnimationFrame(frame);
+      window.removeEventListener("wheel", onWheelCapture, { capture: true });
       lenis.destroy();
       instance = null;
       root.style.removeProperty("--scroll-y");

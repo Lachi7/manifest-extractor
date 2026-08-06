@@ -1005,7 +1005,12 @@ button:disabled {
   font-size: 13px;
 }
 
-/* ── Data table ───────────────────────────────────────────────────── */
+/* ── Data table ───────────────────────────────────────────────────────
+   Wide tables scroll sideways inside this box. In the markup it carries
+   `data-lenis-prevent-horizontal`, NOT `data-lenis-prevent`: Lenis keeps
+   driving the page for vertical wheel/swipe (so the page still scrolls with
+   the pointer over a table) and steps aside only for sideways gestures, which
+   the box then handles natively.                                            */
 .table-scroll {
   overflow-x: auto;
   max-width: 100%;

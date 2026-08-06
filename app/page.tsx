@@ -687,7 +687,7 @@ function TableView({
           <button onClick={() => downloadJson(`${base}_${slug}.json`, fullJson)}>Download JSON</button>
         </div>
       </div>
-      <div className="table-scroll" data-lenis-prevent>
+      <div className="table-scroll" data-lenis-prevent-horizontal>
         <table>
           <thead>
             <tr>
@@ -788,7 +788,7 @@ function ReviewView({
           </button>
         </div>
       </div>
-      <div className="table-scroll" data-lenis-prevent>
+      <div className="table-scroll" data-lenis-prevent-horizontal>
         <table>
           <thead>
             <tr>
@@ -846,7 +846,7 @@ function GngTableView({
           <button onClick={() => downloadJson(`${base}_gng_wagon.json`, rows)}>Download JSON</button>
         </div>
       </div>
-      <div className="table-scroll" data-lenis-prevent>
+      <div className="table-scroll" data-lenis-prevent-horizontal>
         <table>
           <thead>
             <tr>
